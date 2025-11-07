@@ -1,0 +1,23 @@
+# Ignore notebooks
+*.ipynb
+
+# Ignore other Python files not needed for deployment
+main.py
+
+# Ignore project management files
+uv.lock
+
+# Ignore Python cache and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+
+# Ignore local environment files
+.env
+.env.local
+
