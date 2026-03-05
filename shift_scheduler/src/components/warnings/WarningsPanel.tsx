@@ -5,8 +5,7 @@ import { useState, useMemo } from "react";
 type WarningCategory = {
   label: string;
   icon: string;
-  color: string;
-  bgColor: string;
+  colorClass: string;
   items: string[];
 };
 
@@ -14,48 +13,42 @@ const CATEGORY_DEFS: {
   key: string;
   label: string;
   icon: string;
-  color: string;
-  bgColor: string;
+  colorClass: string;
   match: (warning: string) => boolean;
 }[] = [
   {
     key: "daily-limit",
-    label: "Daily Hour Limit Exceeded",
+    label: "Daily Hour Limit",
     icon: "⏱",
-    color: "text-danger",
-    bgColor: "bg-danger-light",
+    colorClass: "text-danger",
     match: (w) => /h\/day/.test(w),
   },
   {
     key: "weekly-limit",
-    label: "Weekly Hour Limit Exceeded",
+    label: "Weekly Hour Limit",
     icon: "📅",
-    color: "text-warning",
-    bgColor: "bg-warning-light",
+    colorClass: "text-warning",
     match: (w) => /h\/week/.test(w),
   },
   {
     key: "availability",
-    label: "Employee Unavailable",
+    label: "Unavailable",
     icon: "🚫",
-    color: "text-muted",
-    bgColor: "bg-surface",
+    colorClass: "text-muted",
     match: (w) => /not available/.test(w),
   },
   {
     key: "overlap",
     label: "Shift Overlap",
     icon: "🔄",
-    color: "text-primary",
-    bgColor: "bg-primary-light",
+    colorClass: "text-primary",
     match: (w) => /overlap/.test(w),
   },
   {
     key: "no-employees",
-    label: "No Available Employees",
+    label: "No Employees",
     icon: "👤",
-    color: "text-danger",
-    bgColor: "bg-danger-light",
+    colorClass: "text-danger",
     match: (w) => /no available employees/.test(w),
   },
 ];
@@ -82,27 +75,18 @@ const categorize = (warnings: string[]): WarningCategory[] => {
   for (const def of CATEGORY_DEFS) {
     const items = buckets.get(def.key);
     if (items && items.length > 0) {
-      result.push({ label: def.label, icon: def.icon, color: def.color, bgColor: def.bgColor, items });
+      result.push({ label: def.label, icon: def.icon, colorClass: def.colorClass, items });
     }
   }
 
   if (uncategorized.length > 0) {
-    result.push({
-      label: "Other",
-      icon: "ℹ️",
-      color: "text-muted",
-      bgColor: "bg-surface",
-      items: uncategorized,
-    });
+    result.push({ label: "Other", icon: "ℹ️", colorClass: "text-muted", items: uncategorized });
   }
 
   return result;
 };
 
-type Props = {
-  warnings: string[];
-  compact?: boolean;
-};
+type Props = { warnings: string[]; compact?: boolean };
 
 export const WarningsPanel = ({ warnings, compact = false }: Props) => {
   const categories = useMemo(() => categorize(warnings), [warnings]);
@@ -121,40 +105,46 @@ export const WarningsPanel = ({ warnings, compact = false }: Props) => {
 
   return (
     <section className={`rounded-2xl border border-warning/20 bg-warning-light ${compact ? "p-4" : "p-5"}`}>
-      <h3 className={`font-semibold text-warning ${compact ? "text-xs" : "text-sm"}`}>
-        Warnings ({warnings.length})
-      </h3>
-      <p className="mt-0.5 mb-3 text-[10px] text-muted">
-        Grouped by cause &mdash; click a category to expand
-      </p>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className={`font-semibold text-warning ${compact ? "text-xs" : "text-sm"}`}>
+          {warnings.length} Warning{warnings.length !== 1 ? "s" : ""}
+        </h3>
+        <span className="text-[9px] uppercase tracking-wider text-warning/60 font-medium">Click to expand</span>
+      </div>
+      <p className="mb-4 text-[10px] text-muted">Grouped by cause</p>
 
       <div className="space-y-2">
         {categories.map((cat) => {
           const isOpen = expanded.has(cat.label);
           return (
-            <div key={cat.label} className="rounded-xl border border-border/50 bg-card overflow-hidden">
+            <div key={cat.label} className="rounded-xl border border-border/40 bg-card overflow-hidden">
               <button
                 onClick={() => toggle(cat.label)}
-                className="flex w-full items-center justify-between px-3.5 py-2.5 text-left hover:bg-surface/50 transition-colors"
+                className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-surface/40 transition-colors"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <span className="text-sm">{cat.icon}</span>
-                  <span className={`text-xs font-medium ${cat.color}`}>{cat.label}</span>
+                  <span className={`text-xs font-medium ${cat.colorClass}`}>{cat.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${cat.bgColor} ${cat.color}`}>
+                  <span className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[9px] font-bold bg-warning-light text-warning`}>
                     {cat.items.length}
                   </span>
-                  <span className="text-muted text-[10px]">{isOpen ? "▲" : "▼"}</span>
+                  <svg
+                    className={`h-3.5 w-3.5 text-muted transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
               </button>
 
               {isOpen && (
-                <div className="border-t border-border/40 px-3.5 py-2.5">
-                  <ul className={`space-y-1.5 ${compact ? "max-h-32" : "max-h-48"} overflow-y-auto`}>
+                <div className="border-t border-border/30 px-4 py-3">
+                  <ul className={`space-y-1.5 ${compact ? "max-h-28" : "max-h-44"} overflow-y-auto`}>
                     {cat.items.map((w, i) => (
-                      <li key={i} className="flex items-start gap-2 text-[11px] leading-relaxed text-foreground/80">
-                        <span className={`mt-0.5 shrink-0 text-[6px] ${cat.color}`}>●</span>
+                      <li key={i} className="flex items-start gap-2 text-[11px] leading-relaxed text-foreground/70">
+                        <span className={`mt-1 shrink-0 text-[5px] ${cat.colorClass}`}>●</span>
                         <span>{w}</span>
                       </li>
                     ))}
