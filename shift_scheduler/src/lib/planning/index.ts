@@ -13,6 +13,7 @@ import type {
   PlanConfig,
   CoverageInterval,
 } from "@/types";
+import { UTC_DAYS } from "@/lib/constants";
 
 const DEFAULT_CONFIG: PlanConfig = {
   minShiftHours: 4,
@@ -29,19 +30,17 @@ const utcStartOfDay = (d: Date): Date =>
   new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
 const formatUTC = (d: Date) => {
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const hh = String(d.getUTCHours()).padStart(2, "0");
   const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${days[d.getUTCDay()]} ${hh}:${mm}`;
+  return `${UTC_DAYS[d.getUTCDay()]} ${hh}:${mm}`;
 };
 
 const formatUTCDate = (d: Date) => {
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const mo = String(d.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(d.getUTCDate()).padStart(2, "0");
   const hh = String(d.getUTCHours()).padStart(2, "0");
   const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${days[d.getUTCDay()]} ${mo}/${dd} ${hh}:${mm}`;
+  return `${UTC_DAYS[d.getUTCDay()]} ${mo}/${dd} ${hh}:${mm}`;
 };
 
 /** Check whether an employee is available at a specific hour on a given date */

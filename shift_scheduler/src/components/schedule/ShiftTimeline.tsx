@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { parseISO, format, differenceInHours, addHours } from "date-fns";
 import type { Shift, Employee } from "@/types";
+import { STORE_OPEN, STORE_CLOSE } from "@/lib/constants";
 
 type Props = {
   shifts: Shift[];
@@ -16,8 +17,6 @@ type Props = {
 
 const HOUR_WIDTH = 52;
 const ROW_HEIGHT = 48;
-const STORE_OPEN = 6;
-const STORE_CLOSE = 22;
 
 const COLORS = [
   "#8b5cf6", "#3b82f6", "#06b6d4", "#10b981",
@@ -55,16 +54,15 @@ export const ShiftTimeline = ({
   // Per-employee hours on this day
   const empHours = useMemo(() => {
     const map = new Map<string, number>();
+    const nextDayMs = dayStartMs + 86_400_000;
     employees.forEach((e) => {
-      const dayMs = dayStart.getTime();
-      const nextDayMs = dayMs + 86_400_000;
       const total = shifts
-        .filter((s) => s.employeeId === e.employeeId && parseISO(s.start).getTime() >= dayMs && parseISO(s.start).getTime() < nextDayMs)
+        .filter((s) => s.employeeId === e.employeeId && parseISO(s.start).getTime() >= dayStartMs && parseISO(s.start).getTime() < nextDayMs)
         .reduce((acc, s) => acc + differenceInHours(parseISO(s.end), parseISO(s.start)), 0);
       map.set(e.employeeId, total);
     });
     return map;
-  }, [shifts, employees, dayStart]);
+  }, [shifts, employees, dayStartMs]);
 
   const handleCellClick = (employeeId: string, hour: number) => {
     const slotStart = addHours(dayStart, hour);
@@ -85,14 +83,12 @@ export const ShiftTimeline = ({
 
   const handleResizeStart = (e: React.MouseEvent, shiftIndex: number) => {
     e.stopPropagation();
+    // Capture original end at mousedown so delta doesn't accumulate
+    const originalEnd = shifts[shiftIndex].end;
 
     const onMove = (me: MouseEvent) => {
-      const dx = me.clientX - e.clientX;
-      const hoursDelta = Math.round(dx / HOUR_WIDTH);
-      if (hoursDelta !== 0) {
-        const newEnd = addHours(parseISO(shifts[shiftIndex].end), hoursDelta);
-        onResizeShift(shiftIndex, newEnd.toISOString());
-      }
+      const hoursDelta = Math.round((me.clientX - e.clientX) / HOUR_WIDTH);
+      onResizeShift(shiftIndex, addHours(parseISO(originalEnd), hoursDelta).toISOString());
     };
 
     const onUp = () => {
@@ -160,7 +156,8 @@ export const ShiftTimeline = ({
             .filter((s) => s.employeeId === emp.employeeId);
           const color = employeeColor.get(emp.employeeId) ?? COLORS[0];
           const hours_today = empHours.get(emp.employeeId) ?? 0;
-          const initials = emp.name.replace(/^\[SAMPLE\] /, "").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+          const displayName = emp.name;
+          const initials = displayName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
           return (
             <div
@@ -180,7 +177,7 @@ export const ShiftTimeline = ({
                 </div>
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold text-foreground truncate leading-tight">
-                    {emp.name.replace(/^\[SAMPLE\] /, "")}
+                    {displayName}
                   </p>
                   {hours_today > 0 && (
                     <p className="text-[9px] text-muted mt-0.5">{hours_today}h today</p>
@@ -190,7 +187,7 @@ export const ShiftTimeline = ({
 
               <div className="relative" style={{ width: hoursInView * HOUR_WIDTH, height: ROW_HEIGHT }}>
                 {/* Grid cells */}
-                {Array.from({ length: hoursInView }, (_, h) => h).map((h) => {
+                {hours.map((h) => {
                   const off = isOffHour(h);
                   return (
                     <div
@@ -239,7 +236,7 @@ export const ShiftTimeline = ({
                         shiftIndex: shift.globalIndex,
                         x: e.clientX,
                         y: e.clientY,
-                        empName: emp.name.replace(/^\[SAMPLE\] /, ""),
+                        empName: displayName,
                         start: shift.start,
                         end: shift.end,
                         hours: h,
@@ -281,7 +278,7 @@ export const ShiftTimeline = ({
         {/* Store hours legend row */}
         <div className="flex border-t border-border/20 bg-surface/20" style={{ minHeight: 20 }}>
           <div className="w-44 shrink-0" />
-          {Array.from({ length: hoursInView }, (_, h) => h).map((h) => (
+          {hours.map((h) => (
             <div
               key={h}
               className="border-l border-border/15"

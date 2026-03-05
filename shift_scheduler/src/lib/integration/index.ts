@@ -60,14 +60,16 @@ export class ClockifyClient {
     return this.request<ClockifyProject[]>(`/workspaces/${workspaceId}/projects`);
   }
 
-  /** Create a project with a specific color. Returns existing project if name matches. */
+  /** Create a project with a specific color. Returns existing project if name matches.
+   *  Pass `existing` to avoid an extra GET /projects round-trip when batching. */
   async ensureProject(
     workspaceId: string,
     name: string,
     color: string,
+    existing?: ClockifyProject[],
   ): Promise<ClockifyProject> {
-    const existing = await this.getProjects(workspaceId);
-    const found = existing.find((p) => p.name === name);
+    const projects = existing ?? await this.getProjects(workspaceId);
+    const found = projects.find((p) => p.name === name);
     if (found) return found;
 
     return this.request<ClockifyProject>(
@@ -131,7 +133,7 @@ export const clockifyUsersToEmployees = (
 ): Employee[] =>
   users.map((u) => ({
     employeeId: u.id,
-    name: u.name || u.email,
+    name: (u.name || u.email).replace(/^\[SAMPLE\] /, ""),
     availability: DEFAULT_AVAILABILITY,
     maxHoursPerDay: 8,
     maxHoursPerWeek: 168,
@@ -204,17 +206,20 @@ export const publishPlan = async (
   const projectCache = new Map<string, string>();
   const uniqueEmployees = [...new Set(plan.shifts.map((s) => s.employeeId))];
 
-  for (let i = 0; i < uniqueEmployees.length; i++) {
-    const empId = uniqueEmployees[i];
-    const empName = names.get(empId) ?? empId;
-    const color = EMPLOYEE_COLORS[i % EMPLOYEE_COLORS.length];
-    try {
-      const project = await client.ensureProject(workspaceId, `Shift - ${empName}`, color);
-      projectCache.set(empId, project.id);
-    } catch {
-      // Non-fatal: shifts will just lack a project/color
-    }
-  }
+  // Fetch existing projects once, then create/reuse in parallel
+  let existingProjects: ClockifyProject[] = [];
+  try { existingProjects = await client.getProjects(workspaceId); } catch { /* non-fatal */ }
+
+  await Promise.allSettled(
+    uniqueEmployees.map(async (empId, i) => {
+      const empName = names.get(empId) ?? empId;
+      const color = EMPLOYEE_COLORS[i % EMPLOYEE_COLORS.length];
+      try {
+        const project = await client.ensureProject(workspaceId, `Shift - ${empName}`, color, existingProjects);
+        projectCache.set(empId, project.id);
+      } catch { /* non-fatal: shifts will just lack a project/color */ }
+    }),
+  );
 
   const results: PublishResult[] = [];
 
@@ -263,13 +268,12 @@ export const clearShifts = async (
         page,
       });
 
-      for (const entry of entries) {
-        try {
-          await client.deleteTimeEntry(workspaceId, entry.id);
-          deleted++;
-        } catch {
-          failed++;
-        }
+      const settled = await Promise.allSettled(
+        entries.map((entry) => client.deleteTimeEntry(workspaceId, entry.id)),
+      );
+      for (const r of settled) {
+        if (r.status === "fulfilled") deleted++;
+        else failed++;
       }
 
       hasMore = entries.length === 200;
