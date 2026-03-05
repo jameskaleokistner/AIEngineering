@@ -8,6 +8,7 @@ import { CoverageSidebar } from "@/components/schedule/CoverageSidebar";
 import { PublishPanel } from "@/components/publish/PublishPanel";
 import { WarningsPanel } from "@/components/warnings/WarningsPanel";
 import type { Plan, DemandPoint, Employee, Shift, CoverageInterval } from "@/types";
+import { SESSION_KEYS } from "@/lib/constants";
 
 export default function PlanPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -16,9 +17,9 @@ export default function PlanPage() {
   const [selectedDay, setSelectedDay] = useState(0);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("shift_plan");
-    const storedDemand = sessionStorage.getItem("shift_demand");
-    const storedEmployees = sessionStorage.getItem("shift_employees");
+    const stored = sessionStorage.getItem(SESSION_KEYS.PLAN);
+    const storedDemand = sessionStorage.getItem(SESSION_KEYS.DEMAND);
+    const storedEmployees = sessionStorage.getItem(SESSION_KEYS.EMPLOYEES);
     if (stored) setPlan(JSON.parse(stored));
     if (storedDemand) setDemand(JSON.parse(storedDemand));
     if (storedEmployees) setEmployees(JSON.parse(storedEmployees));
@@ -38,17 +39,16 @@ export default function PlanPage() {
   const dayStart = days[selectedDay] ?? new Date();
 
   const recomputeCoverage = useCallback(
-    (shifts: Shift[]): CoverageInterval[] =>
-      demand.map((dp) => {
+    (shifts: Shift[]): CoverageInterval[] => {
+      // Pre-parse shift timestamps once instead of O(n×m)
+      const parsed = shifts.map((s) => ({ sStart: parseISO(s.start).getTime(), sEnd: parseISO(s.end).getTime() }));
+      return demand.map((dp) => {
         const slotStart = parseISO(dp.timestamp).getTime();
-        const slotEnd = addHours(parseISO(dp.timestamp), 1).getTime();
-        const assigned = shifts.filter((s) => {
-          const sStart = parseISO(s.start).getTime();
-          const sEnd = parseISO(s.end).getTime();
-          return sStart < slotEnd && sEnd > slotStart;
-        }).length;
+        const slotEnd = slotStart + 3_600_000;
+        const assigned = parsed.filter((s) => s.sStart < slotEnd && s.sEnd > slotStart).length;
         return { timestamp: dp.timestamp, required: dp.requiredHeadcount, assigned, delta: assigned - dp.requiredHeadcount };
-      }),
+      });
+    },
     [demand],
   );
 
@@ -76,31 +76,37 @@ export default function PlanPage() {
     setPlan({ ...plan, shifts: newShifts, coverage: recomputeCoverage(newShifts) });
   }, [plan, recomputeCoverage]);
 
+  // Shared day boundaries for both dayCoverage and dayShifts
+  const [dayMs, nextDayMs] = useMemo(
+    () => [dayStart.getTime(), addDays(dayStart, 1).getTime()],
+    [dayStart],
+  );
+
   const dayCoverage = useMemo(() => {
     if (!plan) return [];
-    const dayMs = dayStart.getTime();
-    const nextDayMs = addDays(dayStart, 1).getTime();
     return plan.coverage.filter((c) => { const t = parseISO(c.timestamp).getTime(); return t >= dayMs && t < nextDayMs; });
-  }, [plan, dayStart]);
+  }, [plan, dayMs, nextDayMs]);
 
-  const dayWarnings = useMemo(() => {
-    if (!plan) return [];
-    const mm = String(dayStart.getUTCMonth() + 1).padStart(2, "0");
-    const dd = String(dayStart.getUTCDate()).padStart(2, "0");
-    const dayStr = `${mm}/${dd}`;
-    return plan.warnings.filter((w) => w.includes(dayStr));
-  }, [plan, dayStart]);
+  // Pre-compute warnings bucketed by day — avoids 7× re-filter on every render
+  const warningsByDay = useMemo(() => {
+    if (!plan) return days.map(() => [] as string[]);
+    return days.map((d) => {
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      return plan.warnings.filter((w) => w.includes(`${mm}/${dd}`));
+    });
+  }, [days, plan]);
+
+  const dayWarnings = warningsByDay[selectedDay] ?? [];
 
   // Day-level stats
   const dayShifts = useMemo(() => {
     if (!plan) return [];
-    const dayMs = dayStart.getTime();
-    const nextDayMs = addDays(dayStart, 1).getTime();
     return plan.shifts.filter((s) => {
       const t = parseISO(s.start).getTime();
       return t >= dayMs && t < nextDayMs;
     });
-  }, [plan, dayStart]);
+  }, [plan, dayMs, nextDayMs]);
 
   const coveragePct = useMemo(() => {
     if (dayCoverage.length === 0) return 0;
@@ -173,10 +179,7 @@ export default function PlanPage() {
           <div className="flex flex-wrap gap-2">
             {days.map((d, i) => {
               const isSelected = i === selectedDay;
-              // Count warnings for this day
-              const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-              const dd2 = String(d.getUTCDate()).padStart(2, "0");
-              const warnCount = plan.warnings.filter((w) => w.includes(`${mm}/${dd2}`)).length;
+              const warnCount = warningsByDay[i]?.length ?? 0;
 
               return (
                 <button

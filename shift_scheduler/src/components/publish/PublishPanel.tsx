@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import type { Employee, Plan, PublishResult, ValidationResult } from "@/types";
+import { validatePlan } from "@/lib/integration";
 
 type Workspace = { id: string; name: string };
 type Props = { plan: Plan; employees?: Employee[] };
 
 export const PublishPanel = ({ plan, employees = [] }: Props) => {
-  const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState("");
   const [publishing, setPublishing] = useState(false);
@@ -18,32 +18,7 @@ export const PublishPanel = ({ plan, employees = [] }: Props) => {
   const [workspacesStatus, setWorkspacesStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [publishedAt, setPublishedAt] = useState<Date | null>(null);
 
-  // Validate plan on change
-  useEffect(() => {
-    const errors: string[] = [];
-    plan.shifts.forEach((shift, idx) => {
-      const start = new Date(shift.start).getTime();
-      const end = new Date(shift.end).getTime();
-      if (end <= start) errors.push(`Shift ${idx}: invalid duration`);
-      if (!shift.employeeId) errors.push(`Shift ${idx}: missing employeeId`);
-    });
-
-    const byEmp = new Map<string, typeof plan.shifts>();
-    plan.shifts.forEach((s) => {
-      const list = byEmp.get(s.employeeId) ?? [];
-      list.push(s);
-      byEmp.set(s.employeeId, list);
-    });
-    for (const [empId, shiftList] of byEmp) {
-      const sorted = [...shiftList].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-      for (let i = 1; i < sorted.length; i++) {
-        if (new Date(sorted[i].start).getTime() < new Date(sorted[i - 1].end).getTime()) {
-          errors.push(`${empId}: overlapping shifts`);
-        }
-      }
-    }
-    setValidation({ valid: errors.length === 0, errors });
-  }, [plan]);
+  const validation = useMemo(() => validatePlan(plan), [plan]);
 
   // Auto-load workspaces on mount
   const loadWorkspaces = useCallback(async () => {

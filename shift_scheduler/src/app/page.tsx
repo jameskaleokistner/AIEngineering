@@ -7,6 +7,7 @@ import { LaborChart } from "@/components/charts/LaborChart";
 import { CoverageDeltaChart } from "@/components/charts/CoverageDeltaChart";
 import { WarningsPanel } from "@/components/warnings/WarningsPanel";
 import type { DemandPoint, Employee, Plan } from "@/types";
+import { SESSION_KEYS } from "@/lib/constants";
 
 type LoadStatus = "loading" | "loaded" | "error" | "idle";
 
@@ -96,9 +97,9 @@ export default function Dashboard() {
   // Persist plan to sessionStorage whenever it changes
   useEffect(() => {
     if (plan) {
-      sessionStorage.setItem("shift_plan", JSON.stringify(plan));
-      sessionStorage.setItem("shift_demand", JSON.stringify(demand));
-      sessionStorage.setItem("shift_employees", JSON.stringify(employees));
+      sessionStorage.setItem(SESSION_KEYS.PLAN, JSON.stringify(plan));
+      sessionStorage.setItem(SESSION_KEYS.DEMAND, JSON.stringify(demand));
+      sessionStorage.setItem(SESSION_KEYS.EMPLOYEES, JSON.stringify(employees));
     }
   }, [plan, demand, employees]);
 
@@ -133,11 +134,6 @@ export default function Dashboard() {
               <Link
                 href="/plan"
                 className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground hover:bg-surface transition-colors"
-                onClick={() => {
-                  sessionStorage.setItem("shift_plan", JSON.stringify(plan));
-                  sessionStorage.setItem("shift_demand", JSON.stringify(demand));
-                  sessionStorage.setItem("shift_employees", JSON.stringify(employees));
-                }}
               >
                 Planning
               </Link>
@@ -220,7 +216,7 @@ export default function Dashboard() {
               status={employeesStatus}
               detail={
                 employeesStatus === "loaded" && employees.length > 0
-                  ? employees.map((e) => e.name.replace(/^\[SAMPLE\] /, "")).join(" · ")
+                  ? employees.map((e) => e.name).join(" · ")
                   : undefined
               }
               onRetry={() => loadEmployees()}
@@ -367,11 +363,6 @@ export default function Dashboard() {
             <Link
               href="/plan"
               className="group inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 px-10 py-4 text-sm font-bold text-white shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all duration-300 hover:scale-105 hover:brightness-110"
-              onClick={() => {
-                sessionStorage.setItem("shift_plan", JSON.stringify(plan));
-                sessionStorage.setItem("shift_demand", JSON.stringify(demand));
-                sessionStorage.setItem("shift_employees", JSON.stringify(employees));
-              }}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
