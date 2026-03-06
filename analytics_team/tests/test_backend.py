@@ -14,6 +14,7 @@ client = TestClient(app)
 # POST /chat
 # ---------------------------------------------------------------------------
 
+
 def test_chat_file_saved_to_data(tmp_path, monkeypatch):
     """Uploaded file is written to data/ with run_id prefix."""
     monkeypatch.setattr("backend.main.DATA_DIR", tmp_path / "data")
@@ -80,6 +81,7 @@ def test_chat_no_files(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # GET /report/{run_id}
 # ---------------------------------------------------------------------------
+
 
 def test_report_404_before_pipeline(tmp_path, monkeypatch):
     """GET /report returns 404 when no PDF exists for the run_id."""

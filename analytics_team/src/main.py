@@ -6,9 +6,7 @@ from pathlib import Path
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Run the analytics pipeline on a data file."
-    )
+    parser = argparse.ArgumentParser(description="Run the analytics pipeline on a data file.")
     parser.add_argument(
         "--input",
         required=True,
