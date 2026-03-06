@@ -201,7 +201,7 @@ Executive Summary · Data Overview · Key Metrics · Visualizations · Detailed 
 |------|-------------|--------|
 | 1 | Scaffold — dirs, `pyproject.toml`, CLI stub, Next.js frontend | ✅ Done |
 | 2 | Web App Backend (FastAPI + OpenRouter) | ✅ Done |
-| 3 | Web App Frontend (Next.js chat UI + SSE + PDF render) | ⬜ Pending |
+| 3 | Web App Frontend (Next.js chat UI + SSE + PDF render) | ✅ Done |
 | 4 | Context File Schemas (Pydantic models + round-trip serialization) | ⬜ Pending |
 | 5 | Clean Specialist (Claude) | ⬜ Pending |
 | 6 | Analyze Specialist (Claude) | ⬜ Pending |
