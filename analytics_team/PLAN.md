@@ -88,20 +88,27 @@ Each model: `to_md(path)` + `from_md(path)`.
 
 ---
 
-### 5. Clean Specialist _(Claude)_
-`src/clean/agent.py` · `run(config: RunConfig, instructions: Instructions) -> CleanOutput`
+### 5. Clean Specialist _(Claude)_ ✅ Done
+`src/clean/agent.py` + `src/clean/tools.py`
+`run(config: RunConfig, instructions: Instructions, base_dir: Path | None) -> CleanOutput`
 
-1. Follow `instructions.task` — what to load and what cleaning is required
-2. Load file from `data/` (CSV, Excel, JSON, parquet)
-3. Capture schema: row count, column names, dtypes, null counts
-4. Standardize types; parse dates; coerce numerics
-5. Impute missing (median/mode) — log each decision
-6. Drop duplicates — log count
-7. Flag outliers (>3 std dev) — log, do not drop
-8. Save cleaned data to `cleaned_data/cleaned_<run_id>.parquet`
-9. Write `context/CLEAN_OUTPUT.md`
+Claude Sonnet agent with tool use. Claude interprets `instructions.task` and calls tools
+to clean the data. All decisions are logged via the tool layer.
 
-**Tests:** schema fields present; every instructed transformation appears in log; row loss explained; parquet is valid; `status: failed` on unsupported file type
+**Tool set (src/clean/tools.py):** `inspect_dataframe`, `parse_date_column`,
+`coerce_numeric_column`, `rename_column`, `drop_column`, `impute_missing`,
+`drop_duplicates`, `flag_outliers`, `create_dataframe_from_records`,
+`report_quality_issue`, `finish_cleaning`
+
+**File routing:**
+- CSV / Excel / JSON / Parquet → load with pandas; schema shown to Claude as context
+- PDF → sent as `document` content block; Claude calls `create_dataframe_from_records`
+- Images (png/jpg/gif/webp) → sent as `image` content block; same extraction path
+
+**New dep added:** `openpyxl>=3.1.0`
+
+**Tests:** schema fields present; every instructed transformation in log; row loss explained;
+parquet valid and round-trips; `status: failed` on unsupported file type; 29 tests total
 
 ---
 
